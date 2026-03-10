@@ -1,4 +1,4 @@
-const CACHE = 'run-timer-v7';
+const CACHE = 'run-timer-v8';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {
