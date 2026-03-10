@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<title>Run Timer</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --run: #e84545;
+    --walk: #2d82b7;
+    --warmup: #4ecdc4;
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --text: #eee;
+    --muted: #888;
+  }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; font-weight: 600; }
+
+  /* Setup form */
+  .setup { width: 100%; max-width: 360px; }
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .duration-inputs { display: flex; gap: 0.5rem; align-items: center; }
+  .duration-inputs input {
+    width: 4.5rem;
+    text-align: center;
+  }
+  .duration-inputs span {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  input[type="number"] {
+    background: var(--surface);
+    border: 2px solid #333;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 1.5rem;
+    padding: 0.6rem;
+    width: 100%;
+    -moz-appearance: textfield;
+  }
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input:focus { outline: none; border-color: var(--run); }
+  .btn {
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-start { background: var(--run); color: white; }
+  .btn-stop { background: #555; color: white; }
+  .btn-pause { background: #e8a545; color: #1a1a2e; }
+
+  /* Active workout */
+  .workout {
+    display: none;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .workout.active { display: flex; flex-direction: column; }
+  .setup.hidden { display: none; }
+
+  .interval-label {
+    font-size: 3rem;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .activity {
+    font-size: 3rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    transition: color 0.3s;
+  }
+  .activity.run { color: var(--run); }
+  .activity.walk { color: var(--walk); }
+  .activity.warmup { color: var(--warmup); }
+
+  .timer {
+    font-size: 6rem;
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+  .phase-note {
+    font-size: 1.1rem;
+    color: var(--muted);
+    min-height: 1.5em;
+    margin-bottom: 1.5rem;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--surface);
+    border-radius: 3px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s linear, background-color 0.3s;
+  }
+
+  .controls { display: flex; gap: 0.75rem; }
+  .controls .btn { flex: 1; }
+
+  .done-screen {
+    display: none;
+    text-align: center;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+  }
+  .done-screen.active { display: flex; }
+  .done-screen .checkmark { font-size: 4rem; margin-bottom: 1rem; }
+  .done-screen h2 { font-size: 2rem; margin-bottom: 0.5rem; }
+  .done-screen .stats { color: var(--muted); font-size: 1rem; margin-bottom: 2rem; }
+</style>
+</head>
+<body>
+
+<h1>Run Timer</h1>
+
+<div class="setup" id="setup">
+  <div class="field">
+    <label>Warm-up</label>
+    <div class="duration-inputs">
+      <input type="number" id="warmMin" min="0" max="59" value="5" inputmode="numeric"> <span>min</span>
+      <input type="number" id="warmSec" min="0" max="59" value="0" inputmode="numeric"> <span>sec</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>Run Interval</label>
+    <div class="duration-inputs">
+      <input type="number" id="runMin" min="0" max="59" value="1" inputmode="numeric"> <span>min</span>
+      <input type="number" id="runSec" min="0" max="59" value="0" inputmode="numeric"> <span>sec</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>Walk Interval</label>
+    <div class="duration-inputs">
+      <input type="number" id="walkMin" min="0" max="59" value="1" inputmode="numeric"> <span>min</span>
+      <input type="number" id="walkSec" min="0" max="59" value="0" inputmode="numeric"> <span>sec</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>Repetitions</label>
+    <input type="number" id="reps" min="1" max="99" value="10" inputmode="numeric">
+  </div>
+  <div class="field">
+    <label>Cool-down</label>
+    <div class="duration-inputs">
+      <input type="number" id="coolMin" min="0" max="59" value="5" inputmode="numeric"> <span>min</span>
+      <input type="number" id="coolSec" min="0" max="59" value="0" inputmode="numeric"> <span>sec</span>
+    </div>
+  </div>
+  <button class="btn btn-start" id="startBtn">Start</button>
+</div>
+
+<div class="workout" id="workout">
+  <div class="interval-label" id="intervalLabel">Interval 1 of 10</div>
+  <div class="activity run" id="activityLabel">Run</div>
+  <div class="timer" id="timerDisplay">1:00</div>
+  <div class="phase-note" id="phaseNote"></div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="controls">
+    <button class="btn btn-pause" id="pauseBtn">Pause</button>
+    <button class="btn btn-stop" id="stopBtn">Stop</button>
+  </div>
+</div>
+
+<div class="done-screen" id="doneScreen">
+  <div class="checkmark">&#10003;</div>
+  <h2>Done!</h2>
+  <div class="stats" id="doneStats"></div>
+  <button class="btn btn-start" id="againBtn">Again</button>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// State
+let runSeconds, walkSeconds, warmupSeconds, cooldownSeconds, totalReps;
+let currentRep, isRunning, isPaused, isRunPhase;
+let workoutPhase; // 'warmup', 'intervals', 'cooldown'
+let remaining, phaseDuration;
+let tickInterval, wakeLock;
+let elapsedSeconds;
+let phaseStartTime;   // Date.now() when current phase started
+let workoutStartTime; // Date.now() when workout started
+let pauseStartTime;   // Date.now() when pause began
+let totalPausedMs;    // total ms spent paused during current phase
+let workoutPausedMs;  // total ms spent paused during entire workout
+let lastAnnouncedRemaining; // track what we last announced to avoid repeats
+
+// Speak
+function say(text) {
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.1;
+  u.pitch = 1.0;
+  speechSynthesis.speak(u);
+}
+
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+// Format time
+function fmt(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+// Save/load settings
+function saveSettings() {
+  localStorage.setItem('runTimer', JSON.stringify({
+    runMin: $('runMin').value, runSec: $('runSec').value,
+    walkMin: $('walkMin').value, walkSec: $('walkSec').value,
+    warmMin: $('warmMin').value, warmSec: $('warmSec').value,
+    coolMin: $('coolMin').value, coolSec: $('coolSec').value,
+    reps: $('reps').value
+  }));
+}
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('runTimer'));
+    if (!s) return;
+    $('runMin').value = s.runMin;
+    $('runSec').value = s.runSec;
+    $('walkMin').value = s.walkMin;
+    $('walkSec').value = s.walkSec;
+    if (s.warmMin !== undefined) $('warmMin').value = s.warmMin;
+    if (s.warmSec !== undefined) $('warmSec').value = s.warmSec;
+    if (s.coolMin !== undefined) $('coolMin').value = s.coolMin;
+    if (s.coolSec !== undefined) $('coolSec').value = s.coolSec;
+    $('reps').value = s.reps;
+  } catch(e) {}
+}
+
+// Wake lock
+async function acquireWake() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch(e) {}
+}
+function releaseWake() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+// UI updates
+function updateDisplay() {
+  let label, color;
+  if (workoutPhase === 'warmup') {
+    label = 'Warm Up';
+    color = 'warmup';
+  } else if (workoutPhase === 'cooldown') {
+    label = 'Cool Down';
+    color = 'warmup';
+  } else {
+    label = isRunPhase ? 'Run' : 'Walk';
+    color = isRunPhase ? 'run' : 'walk';
+  }
+
+  const elapsedStr = elapsedSeconds !== undefined ? ` \u00b7 ${fmt(elapsedSeconds)} elapsed` : '';
+  if (workoutPhase === 'warmup') {
+    $('intervalLabel').textContent = `Warm Up${elapsedStr}`;
+  } else if (workoutPhase === 'cooldown') {
+    $('intervalLabel').textContent = `Cool Down${elapsedStr}`;
+  } else {
+    $('intervalLabel').textContent = `Interval ${currentRep} of ${totalReps}${elapsedStr}`;
+  }
+  $('activityLabel').textContent = label;
+  $('activityLabel').className = `activity ${color}`;
+  $('timerDisplay').textContent = fmt(remaining);
+
+  const pct = ((phaseDuration - remaining) / phaseDuration) * 100;
+  $('progressFill').style.width = `${pct}%`;
+  if (workoutPhase === 'warmup' || workoutPhase === 'cooldown') {
+    $('progressFill').style.backgroundColor = 'var(--warmup)';
+  } else {
+    $('progressFill').style.backgroundColor = isRunPhase ? 'var(--run)' : 'var(--walk)';
+  }
+}
+
+// Phase logic
+function startPhase(silent) {
+  if (workoutPhase === 'warmup') {
+    phaseDuration = warmupSeconds;
+    if (!silent) say('Warm up. Go!');
+  } else if (workoutPhase === 'cooldown') {
+    phaseDuration = cooldownSeconds;
+    if (!silent) say('Cool down.');
+  } else {
+    phaseDuration = isRunPhase ? runSeconds : walkSeconds;
+    if (!silent) {
+      if (isRunPhase) {
+        say(`Interval ${currentRep} of ${totalReps}. Run. Go!`);
+      } else {
+        say('Switch to Walk');
+      }
+    }
+  }
+  remaining = phaseDuration;
+  phaseStartTime = Date.now();
+  totalPausedMs = 0;
+  lastAnnouncedRemaining = phaseDuration;
+  if (!silent) vibrate([200]);
+
+  $('phaseNote').textContent = '';
+  updateDisplay();
+}
+
+// Advance to next phase, returns false if workout is done
+function advancePhase() {
+  if (workoutPhase === 'warmup') {
+    workoutPhase = 'intervals';
+    currentRep = 1;
+    isRunPhase = true;
+  } else if (workoutPhase === 'cooldown') {
+    return false;
+  } else if (isRunPhase) {
+    isRunPhase = false;
+  } else {
+    currentRep++;
+    if (currentRep > totalReps) {
+      if (cooldownSeconds > 0) {
+        workoutPhase = 'cooldown';
+      } else {
+        return false;
+      }
+    } else {
+      isRunPhase = true;
+    }
+  }
+  return true;
+}
+
+// Catch up after iOS suspension — fast-forward through missed phases
+function catchUp() {
+  if (!isRunning || isPaused) return;
+
+  const totalElapsedMs = Date.now() - workoutStartTime - workoutPausedMs;
+  elapsedSeconds = Math.floor(totalElapsedMs / 1000);
+
+  const elapsedPhaseMs = Date.now() - phaseStartTime - totalPausedMs;
+  let overflowSec = Math.floor(elapsedPhaseMs / 1000) - phaseDuration;
+
+  // No overflow — still in current phase
+  if (overflowSec <= 0) return;
+
+  // Fast-forward through completed phases silently
+  let safety = 200;
+  while (overflowSec > 0 && safety-- > 0) {
+    if (!advancePhase()) {
+      finish();
+      return;
+    }
+    // Set up this phase
+    if (workoutPhase === 'warmup') phaseDuration = warmupSeconds;
+    else if (workoutPhase === 'cooldown') phaseDuration = cooldownSeconds;
+    else phaseDuration = isRunPhase ? runSeconds : walkSeconds;
+
+    if (overflowSec >= phaseDuration) {
+      overflowSec -= phaseDuration;
+    } else {
+      // Landed in this phase — set it up with correct start time
+      phaseStartTime = Date.now() - (overflowSec * 1000);
+      totalPausedMs = 0;
+      remaining = phaseDuration - overflowSec;
+      lastAnnouncedRemaining = remaining;
+      overflowSec = 0;
+    }
+  }
+
+  // Announce current state
+  if (workoutPhase === 'warmup') {
+    say('Warm up');
+  } else if (workoutPhase === 'cooldown') {
+    say('Cool down');
+  } else {
+    const label = isRunPhase ? 'Run' : 'Walk';
+    say(`${label}. Interval ${currentRep} of ${totalReps}`);
+  }
+  vibrate([200, 100, 200]);
+  updateDisplay();
+}
+
+function tick() {
+  if (isPaused) return;
+
+  // Wall-clock remaining
+  const elapsedPhaseMs = Date.now() - phaseStartTime - totalPausedMs;
+  remaining = Math.max(0, phaseDuration - Math.floor(elapsedPhaseMs / 1000));
+
+  // Wall-clock total elapsed
+  const totalElapsedMs = Date.now() - workoutStartTime - workoutPausedMs;
+  elapsedSeconds = Math.floor(totalElapsedMs / 1000);
+
+  // Announcements (only fire once per second boundary)
+  if (remaining !== lastAnnouncedRemaining) {
+    const half = Math.floor(phaseDuration / 2);
+    if (remaining === half && phaseDuration >= 10) {
+      say('Halfway');
+      $('phaseNote').textContent = 'Halfway';
+      vibrate([100]);
+    } else if (remaining <= 3 && remaining > 0) {
+      $('phaseNote').textContent = `${remaining}...`;
+    }
+    lastAnnouncedRemaining = remaining;
+  }
+
+  // Phase complete
+  if (remaining <= 0) {
+    if (!advancePhase()) {
+      finish();
+      return;
+    }
+    startPhase();
+    return;
+  }
+
+  updateDisplay();
+}
+
+function finish() {
+  clearInterval(tickInterval);
+  isRunning = false;
+  releaseWake();
+
+  say('Workout complete. Nice work!');
+  vibrate([200, 100, 200, 100, 200]);
+
+  $('doneStats').textContent = `${totalReps} intervals \u00b7 ${fmt(elapsedSeconds)} total`;
+
+  $('workout').classList.remove('active');
+  $('doneScreen').classList.add('active');
+}
+
+// Controls
+$('startBtn').addEventListener('click', () => {
+  runSeconds = (parseInt($('runMin').value) || 0) * 60 + (parseInt($('runSec').value) || 0);
+  walkSeconds = (parseInt($('walkMin').value) || 0) * 60 + (parseInt($('walkSec').value) || 0);
+  warmupSeconds = (parseInt($('warmMin').value) || 0) * 60 + (parseInt($('warmSec').value) || 0);
+  cooldownSeconds = (parseInt($('coolMin').value) || 0) * 60 + (parseInt($('coolSec').value) || 0);
+  totalReps = parseInt($('reps').value) || 1;
+
+  if (runSeconds < 5 || walkSeconds < 5) {
+    alert('Intervals must be at least 5 seconds');
+    return;
+  }
+
+  saveSettings();
+
+  isRunning = true;
+  isPaused = false;
+  elapsedSeconds = 0;
+  workoutStartTime = Date.now();
+  workoutPausedMs = 0;
+
+  if (warmupSeconds > 0) {
+    workoutPhase = 'warmup';
+    currentRep = 0;
+    isRunPhase = false;
+  } else {
+    workoutPhase = 'intervals';
+    currentRep = 1;
+    isRunPhase = true;
+  }
+
+  $('setup').classList.add('hidden');
+  $('workout').classList.add('active');
+  $('pauseBtn').textContent = 'Pause';
+
+  acquireWake();
+  startPhase();
+  tickInterval = setInterval(tick, 1000);
+});
+
+$('pauseBtn').addEventListener('click', () => {
+  isPaused = !isPaused;
+  $('pauseBtn').textContent = isPaused ? 'Resume' : 'Pause';
+  if (isPaused) {
+    pauseStartTime = Date.now();
+    $('phaseNote').textContent = 'Paused';
+    say('Paused');
+  } else {
+    const pausedMs = Date.now() - pauseStartTime;
+    totalPausedMs += pausedMs;
+    workoutPausedMs += pausedMs;
+    $('phaseNote').textContent = '';
+    say('Go');
+  }
+});
+
+$('stopBtn').addEventListener('click', () => {
+  clearInterval(tickInterval);
+  isRunning = false;
+  releaseWake();
+  speechSynthesis.cancel();
+  $('workout').classList.remove('active');
+  $('setup').classList.remove('hidden');
+});
+
+$('againBtn').addEventListener('click', () => {
+  $('doneScreen').classList.remove('active');
+  $('setup').classList.remove('hidden');
+});
+
+// Re-acquire wake lock and catch up on visibility change
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isRunning && !isPaused) {
+    acquireWake();
+    catchUp();
+  }
+});
+
+loadSettings();
+
+if ('serviceWorker' in navigator) {
+  // Force unregister old SW, then register fresh
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    Promise.all(regs.map(r => r.unregister())).then(() => {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+      navigator.serviceWorker.register('sw.js');
+    });
+  });
+}
+</script>
+</body>
+</html>
